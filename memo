@@ -1,0 +1,18 @@
+360度画像のまま物体認識or特徴量を取ってそれの多いとこで平面切り出して認識(人が途切れるの解消)
+トラッキング(動画内で同じ人間だと紐付ける)StrongSORT
+rtmp(通信？)
+
+
+ビデオ表示
+https://teratail.com/questions/57393
+
+カメラ距離高さ1.45m 横2.08m
+
+v8のresult取り出し方
+https://chem-fac.com/yolov8/#st-toc-h-14
+
+移動平均 fin
+
+高速化
+並列処理
+数コマに一回検知する
