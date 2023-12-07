@@ -280,27 +280,6 @@ class PanoramaViewer(metaclass=ABCMeta):
                 return x1,y1,x2,y2
         return -1,-1,-1,-1
     
-    def output(self, image=None, filename=None):
-        if image is None:
-            mapping_style = self._projector.parse_mapping_style(self._mapping_style)
-            image = self._projector(self._image, self._lon, self._lat, self._d, self._width, self._height,
-                                    mapping_style=mapping_style, fov_mode=False)
-        if filename is None:
-            filename = 'save/{}_{}_{}_{}_{}.jpg'.format(self._lon, self._lat, self._d, self._width, self._height)
-        cv2.imwrite(filename, image)
- 
-    def inverse(self, layer_path, image=None, filename=None):
-        if image is None:
-            perspective = cv2.imread(layer_path, cv2.IMREAD_UNCHANGED)
-            [panorama_height, panorama_width, _] = self._image.shape
- 
-            mapping_style = self._projector.parse_mapping_style(self._mapping_style)
-            image = self._projector.inverse(
-                perspective, self._lon, self._lat, self._d, panorama_width, panorama_height,
-                mapping_style=mapping_style, fov_mode=False)
-        if filename is None:
-            filename = 'save/{}_{}_{}_{}_{}.png'.format(self._lon, self._lat, self._d, self._width, self._height)
-        cv2.imwrite(filename, image)
 
 class VideoViewer():
     def __init__(self, video_path,projector,model, width=1200, height=600,pict_width = 800,pict_height =600):
@@ -327,8 +306,19 @@ class VideoViewer():
             latcnt = 0 # [-13,13]
             lastmag = 1 #拡大倍率
             ball_find = True
+            frequent_cnt = -1
+
             while True:
+                tstart = time.time()
                 ret, img = self._cap.read()
+                frequent_cnt+= 1
+                if(frequent_cnt % 5 != 0):
+                    viewer = PanoramaViewer(img, self._projector,self._model,loncnt,latcnt)
+                    viewer._d *= lastmag
+                    viewer()
+                    tend = time.time()
+                    # print("time: ",frequent_cnt,": ",tend -tstart)
+                    continue
                 #方針最初だけ全探索して後は差分だけ最初は一番いいのを選ぶ
                 cost = math.inf
 
@@ -407,34 +397,18 @@ class VideoViewer():
                 if ret == False:
                     is_continue = False
                     break
-                # lを押すとストップ。
-                # if cv2.waitKey(1) & 0xFF == ord('l'):
-                #     while True:
-                #         if cv2.waitKey(0) & 0xFF == ord('l'):
-                #             break
-                #         else :
-                #             cv2.destroyAllWindows()
-                #             viewer = PanoramaViewer(img, self._projector,self._model)
-                #             viewer()
-                #             break
-                #     # break
+                
                 # # qを押すと再生終了
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     is_continue = False
                     break
+                
+                tend = time.time()
+                # print("time: ",frequent_cnt,": ",tend -tstart)
           
             #再生終了
             if is_continue == False:
                 break
-            
-            #lが押されるまで停止しておく
-            # while True:
-            #     if cv2.waitKey(1) & 0xFF == ord('l'):
-            #         break
-                # if cv2.waitKey(1) & 0xFF == ord('r'):
-                #     frameHeight,frameWidth = frameWidth,frameHeight
-                #     img = cv2.resize(img, (frameWidth, frameHeight))
-                #     cv2.imshow('Video', img)
 
         self._cap.release()
         cv2.destroyAllWindows()
