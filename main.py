@@ -6,8 +6,7 @@ from ultralytics import YOLO
 import copy
 import math
 from collections import deque
-import os
-from contextlib import redirect_stdout
+import time
 
 import numpy as np
 import cv2
