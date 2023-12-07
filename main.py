@@ -5,7 +5,9 @@ from typing import Any
 from ultralytics import YOLO
 import copy
 import math
- 
+from collections import deque
+import time
+
 import numpy as np
 import cv2
  
@@ -254,10 +256,23 @@ class PanoramaViewer(metaclass=ABCMeta):
         # self.detect_feature_point(image)
         return
     
-    def ball_place(self,img):
+    def ball_place(self,img,flag):
+        tstart = time.time()
         image = self._projector(img, self._lon, self._lat, self._d, self._width, self._height,
                         mapping_style=self._mapping_style, fov_mode=False)
-        result = self._model(image)
+        tend = time.time()
+        print("create image",tend  - tstart)
+
+        if flag : 
+            tstart = time.time()
+            result = self._model(image,imgsz=320,verbose=False)
+            tend = time.time()
+            print("detect by320: ",tend  - tstart )
+        else:
+            tstart = time.time()
+            result = self._model(image,imgsz=640,verbose=False)
+            tend = time.time()
+            print("detect by640: ",tend - tstart)
 
         # result[0]からResultsオブジェクトを取り出す
         result_object = result[0]
@@ -306,6 +321,9 @@ class VideoViewer():
         self._pict_width = pict_width
         self._pict_height = pict_height
         self.default_ball_siz = 50
+        self.queue = deque()
+        self.que_sum = 0
+        self.que_limit = 3
 
     def __call__(self):
 
@@ -317,6 +335,7 @@ class VideoViewer():
             loncnt = 0 
             latcnt = 0 # [-13,13]
             lastmag = 1 #拡大倍率
+            ball_find = True
             while True:
                 ret, img = self._cap.read()
                 #方針最初だけ全探索して後は差分だけ最初は一番いいのを選ぶ
@@ -331,7 +350,7 @@ class VideoViewer():
                         for j in range(5):
                             pano._lon =  6 * i * pano._stride
                             pano._lat = 6 * (j-2) * pano._stride
-                            a,b,c,d = pano.ball_place(img)
+                            a,b,c,d = pano.ball_place(img,ball_find)
                             # pano()
                             # cv2.waitKey(0)
                             if a == -1 and b ==  -1 and c == -1 and d == -1:
@@ -359,8 +378,11 @@ class VideoViewer():
                     pano._lat = latcnt * pano._stride
 
                     ball_siz = max(1.0,(abs(xma-xmi) + abs(yma - ymi))/2)
-                    lastmag = ball_siz/self.default_ball_siz
-                    pano._d *= ball_siz/self.default_ball_siz
+                    self.queue.append(ball_siz)
+                    self.que_sum += ball_siz
+
+                    lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
+                    pano._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
 
 
                     pano()
@@ -368,21 +390,27 @@ class VideoViewer():
                     is_first = False
                 else:
                     viewer = PanoramaViewer(img, self._projector,self._model,loncnt,latcnt)
-                    a,b,c,d = viewer.ball_place(img)
+                    a,b,c,d = viewer.ball_place(img,ball_find)
                     if a == -1 and b == -1 and c == -1 and d == -1:
                         viewer._d *= lastmag
+                        ball_find = False
                     else:
                         xmid = (a + c)/2
                         ymid = (b + d)/2
                         loncnt += ((self._pict_width/2-xmid)*6/self._pict_width)
                         latcnt += ((self._pict_height/2-ymid)*6/self._pict_height)
                         ball_siz = (abs(a-c) + abs(b-d))/2
-                        # print(ball_siz)
-                        viewer._d *= ball_siz/self.default_ball_siz
-                        lastmag = ball_siz/self.default_ball_siz
+                        self.queue.append(ball_siz)
+                        self.que_sum += ball_siz
+                        while(len(self.queue) > self.que_limit):
+                            self.que_sum -= self.queue[0]
+                            self.queue.popleft()
+                        viewer._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
+                        lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
+                        ball_find = True
+
                     viewer._lon = loncnt * viewer._stride
                     viewer._lat = latcnt * viewer._stride
-                    print(viewer._d)
                     viewer()
 
                 if ret == False:
@@ -426,7 +454,7 @@ if __name__ == '__main__':
     projector = EquirecProjector()
     # viewer = PanoramaViewer('pingpongball.png', projector,model)
     # viewer()
-    video = VideoViewer('Videos/VID_20231109_135337_20231110122936.mp4',projector,model)
+    video = VideoViewer('./Videos/soccer_base.mov',projector,model)
     video()
 
     
