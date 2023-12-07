@@ -247,9 +247,12 @@ class PanoramaViewer(metaclass=ABCMeta):
         self._lat = latcnt * self._stride
  
     def __call__(self):
+        tstart = time.time()
         image = self._projector(self._image, self._lon, self._lat, self._d, self._width, self._height,
                                 mapping_style=self._mapping_style, fov_mode=False)
         cv2.imshow("image", image)
+        tend= time.time()
+        print("show", tend - tstart) 
         # self._model(image,show=True)
         
         # self.detect_contour(image)
@@ -337,6 +340,7 @@ class VideoViewer():
             lastmag = 1 #拡大倍率
             ball_find = True
             while True:
+                tstart = time.time()
                 ret, img = self._cap.read()
                 #方針最初だけ全探索して後は差分だけ最初は一番いいのを選ぶ
                 cost = math.inf
@@ -412,38 +416,26 @@ class VideoViewer():
                     viewer._lon = loncnt * viewer._stride
                     viewer._lat = latcnt * viewer._stride
                     viewer()
+                
+                
 
                 if ret == False:
                     is_continue = False
                     break
-                # lを押すとストップ。
-                # if cv2.waitKey(1) & 0xFF == ord('l'):
-                #     while True:
-                #         if cv2.waitKey(0) & 0xFF == ord('l'):
-                #             break
-                #         else :
-                #             cv2.destroyAllWindows()
-                #             viewer = PanoramaViewer(img, self._projector,self._model)
-                #             viewer()
-                #             break
-                #     # break
+
                 # # qを押すと再生終了
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     is_continue = False
                     break
+
+                tend = time.time()
+                print("time in cycle",tend - tstart)
+            
           
             #再生終了
             if is_continue == False:
                 break
             
-            #lが押されるまで停止しておく
-            # while True:
-            #     if cv2.waitKey(1) & 0xFF == ord('l'):
-            #         break
-                # if cv2.waitKey(1) & 0xFF == ord('r'):
-                #     frameHeight,frameWidth = frameWidth,frameHeight
-                #     img = cv2.resize(img, (frameWidth, frameHeight))
-                #     cv2.imshow('Video', img)
 
         self._cap.release()
         cv2.destroyAllWindows()
