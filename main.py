@@ -291,9 +291,13 @@ class VideoViewer():
         self._pict_width = pict_width
         self._pict_height = pict_height
         self.default_ball_siz = 50
+        
         self.queue = deque()
         self.que_sum = 0
-        self.que_limit = 3
+        self.que_limit = 3#移動平均を何回で取るか
+
+        self.frequentmod = 5 #何回ごとにdetectを行うか
+    
 
     def __call__(self):
 
@@ -304,20 +308,25 @@ class VideoViewer():
             img = np.zeros((self._height, self._width, 3), np.uint8)
             loncnt = 0 
             latcnt = 0 # [-13,13]
+            d_loncnt = 0
+            d_latcnt = 0
             lastmag = 1 #拡大倍率
             ball_find = True
-            frequent_cnt = -1
+            frequent_cnt = -1#数回に1回detectするために使用
 
             while True:
                 tstart = time.time()
                 ret, img = self._cap.read()
                 frequent_cnt+= 1
-                if(frequent_cnt % 5 != 0):
-                    viewer = PanoramaViewer(img, self._projector,self._model,loncnt,latcnt)
+                if(frequent_cnt % self.frequentmod != 0):
+                    now_loncnt = loncnt + d_loncnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
+                    now_latcnt = latcnt + d_latcnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
+                    print(now_loncnt,now_latcnt,d_loncnt)
+                    viewer = PanoramaViewer(img, self._projector,self._model,now_loncnt,now_latcnt)
                     viewer._d *= lastmag
                     viewer()
                     tend = time.time()
-                    # print("time: ",frequent_cnt,": ",tend -tstart)
+                    print("time: ",frequent_cnt,": ",tend -tstart)
                     continue
                 #方針最初だけ全探索して後は差分だけ最初は一番いいのを選ぶ
                 cost = math.inf
@@ -374,12 +383,16 @@ class VideoViewer():
                     a,b,c,d = viewer.ball_place(img,ball_find)
                     if a == -1 and b == -1 and c == -1 and d == -1:
                         viewer._d *= lastmag
+                        d_loncnt = 0
+                        d_latcnt = 0
                         ball_find = False
                     else:
                         xmid = (a + c)/2
                         ymid = (b + d)/2
-                        loncnt += ((self._pict_width/2-xmid)*6/self._pict_width)
-                        latcnt += ((self._pict_height/2-ymid)*6/self._pict_height)
+                        d_loncnt = (self._pict_width/2-xmid)*6/self._pict_width
+                        d_latcnt = (self._pict_height/2-ymid)*6/self._pict_height
+                        loncnt += (self._pict_width/2-xmid)*6/self._pict_width
+                        latcnt += (self._pict_height/2-ymid)*6/self._pict_height
                         ball_siz = (abs(a-c) + abs(b-d))/2
                         self.queue.append(ball_siz)
                         self.que_sum += ball_siz
@@ -398,13 +411,13 @@ class VideoViewer():
                     is_continue = False
                     break
                 
-                # # qを押すと再生終了
+                # qを押すと再生終了
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     is_continue = False
                     break
                 
                 tend = time.time()
-                # print("time: ",frequent_cnt,": ",tend -tstart)
+                print("time: ",frequent_cnt,": ",tend -tstart)
           
             #再生終了
             if is_continue == False:
@@ -419,7 +432,7 @@ if __name__ == '__main__':
     projector = EquirecProjector()
     # viewer = PanoramaViewer('pingpongball.png', projector,model)
     # viewer()
-    video = VideoViewer('./Videos/soccer_base.mov',projector,model)
+    video = VideoViewer('./Videos/soccer_clear.mp4',projector,model)
     video()
 
     
