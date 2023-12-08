@@ -16,3 +16,5 @@ https://chem-fac.com/yolov8/#st-toc-h-14
 高速化
 並列処理
 数コマに一回検知する
+
+var/www/html/hls 動画の場所
