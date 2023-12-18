@@ -297,6 +297,20 @@ class VideoViewer():
         self.que_limit = 3#移動平均を何回で取るか
 
         self.frequentmod = 5 #何回ごとにdetectを行うか
+        self.image_queue = deque()
+
+
+        self.loncnt = 0 
+        self.latcnt = 0 # [-13,13]
+
+        self.d_loncnt = 0 #変化率
+        self.d_latcnt = 0
+
+        self.lastmag = 1 #拡大倍率
+        self.ball_find = True
+
+    # def detect(self,img):
+
     
 
     def __call__(self):
@@ -306,24 +320,21 @@ class VideoViewer():
             is_first = True
             ret = False
             img = np.zeros((self._height, self._width, 3), np.uint8)
-            loncnt = 0 
-            latcnt = 0 # [-13,13]
-            d_loncnt = 0
-            d_latcnt = 0
-            lastmag = 1 #拡大倍率
-            ball_find = True
+
+
             frequent_cnt = -1#数回に1回detectするために使用
 
             while True:
                 tstart = time.time()
                 ret, img = self._cap.read()
+                self.image_queue.append(img)
                 frequent_cnt+= 1
                 if(frequent_cnt % self.frequentmod != 0):
-                    now_loncnt = loncnt + d_loncnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
-                    now_latcnt = latcnt + d_latcnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
-                    print(now_loncnt,now_latcnt,d_loncnt)
+                    now_loncnt = self.loncnt + self.d_loncnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
+                    now_latcnt = self.latcnt + self.d_latcnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
+                    print(now_loncnt,now_latcnt,self.d_loncnt)
                     viewer = PanoramaViewer(img, self._projector,self._model,now_loncnt,now_latcnt)
-                    viewer._d *= lastmag
+                    viewer._d *= self.lastmag
                     viewer()
                     tend = time.time()
                     print("time: ",frequent_cnt,": ",tend -tstart)
@@ -340,7 +351,7 @@ class VideoViewer():
                         for j in range(5):
                             pano._lon =  6 * i * pano._stride
                             pano._lat = 6 * (j-2) * pano._stride
-                            a,b,c,d = pano.ball_place(img,ball_find)
+                            a,b,c,d = pano.ball_place(img,self.ball_find)
                             # pano()
                             # cv2.waitKey(0)
                             if a == -1 and b ==  -1 and c == -1 and d == -1:
@@ -361,17 +372,17 @@ class VideoViewer():
                     xmid = (xma + xmi)/2
                     ymid = (yma + ymi)/2
 
-                    loncnt = 6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width)
-                    latcnt = 6 * (bestj-2) +((xmid -self._pict_width/2-ymid)*6/self._pict_width)
+                    self.loncnt = 6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width)
+                    self.latcnt = 6 * (bestj-2) +((xmid -self._pict_width/2-ymid)*6/self._pict_width)
 
-                    pano._lon = loncnt * pano._stride
-                    pano._lat = latcnt * pano._stride
+                    pano._lon = self.loncnt * pano._stride
+                    pano._lat = self.latcnt * pano._stride
 
                     ball_siz = max(1.0,(abs(xma-xmi) + abs(yma - ymi))/2)
                     self.queue.append(ball_siz)
                     self.que_sum += ball_siz
 
-                    lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
+                    self.lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
                     pano._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
 
 
@@ -379,20 +390,20 @@ class VideoViewer():
                     cv2.waitKey(0)
                     is_first = False
                 else:
-                    viewer = PanoramaViewer(img, self._projector,self._model,loncnt,latcnt)
-                    a,b,c,d = viewer.ball_place(img,ball_find)
+                    viewer = PanoramaViewer(img, self._projector,self._model,self.loncnt,self.latcnt)
+                    a,b,c,d = viewer.ball_place(img,self.ball_find)
                     if a == -1 and b == -1 and c == -1 and d == -1:
-                        viewer._d *= lastmag
-                        d_loncnt = 0
-                        d_latcnt = 0
-                        ball_find = False
+                        viewer._d *= self.lastmag
+                        self.d_loncnt = 0
+                        self.d_latcnt = 0
+                        self.ball_find = False
                     else:
                         xmid = (a + c)/2
                         ymid = (b + d)/2
-                        d_loncnt = (self._pict_width/2-xmid)*6/self._pict_width
-                        d_latcnt = (self._pict_height/2-ymid)*6/self._pict_height
-                        loncnt += (self._pict_width/2-xmid)*6/self._pict_width
-                        latcnt += (self._pict_height/2-ymid)*6/self._pict_height
+                        self.d_loncnt = (self._pict_width/2-xmid)*6/self._pict_width
+                        self.d_latcnt = (self._pict_height/2-ymid)*6/self._pict_height
+                        self.loncnt += (self._pict_width/2-xmid)*6/self._pict_width
+                        self.latcnt += (self._pict_height/2-ymid)*6/self._pict_height
                         ball_siz = (abs(a-c) + abs(b-d))/2
                         self.queue.append(ball_siz)
                         self.que_sum += ball_siz
@@ -400,11 +411,11 @@ class VideoViewer():
                             self.que_sum -= self.queue[0]
                             self.queue.popleft()
                         viewer._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
-                        lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
-                        ball_find = True
+                        self.lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
+                        self.ball_find = True
 
-                    viewer._lon = loncnt * viewer._stride
-                    viewer._lat = latcnt * viewer._stride
+                    viewer._lon = self.loncnt * viewer._stride
+                    viewer._lat = self.latcnt * viewer._stride
                     viewer()
 
                 if ret == False:
