@@ -19,3 +19,4 @@ https://chem-fac.com/yolov8/#st-toc-h-14
 
 var/www/html/hls 動画の場所
 scp 動画を送る
+なんかhls読み込めたっぽいけどaviを送れないから
