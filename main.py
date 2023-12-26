@@ -233,7 +233,7 @@ class EquirecProjector(PanoramaProjector):
  
 class PanoramaViewer(metaclass=ABCMeta):
 
-    def __init__(self, image_path, projector,model, loncnt=0, latcnt=0, width=800, height=600, fov=105, mapping_style='perspective'):
+    def __init__(self, image_path, projector,model, loncnt=0, latcnt=0,mag = 1, width=800, height=600, fov=105, mapping_style='perspective'):
         # self._image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         self._image = image_path
         self._projector = projector
@@ -241,7 +241,7 @@ class PanoramaViewer(metaclass=ABCMeta):
         self._width = width
         self._height = height
         self._mapping_style = projector.parse_mapping_style(mapping_style)
-        self._d = self._projector.r(np.radians(fov) / 2, mapping_style=self._mapping_style)
+        self._d = self._projector.r(np.radians(fov) / 2, mapping_style=self._mapping_style) * mag
         self._stride = np.degrees(self._projector.r_inv(self._d / 10))
         self._lon = loncnt * self._stride
         self._lat = latcnt * self._stride
@@ -279,7 +279,6 @@ class PanoramaViewer(metaclass=ABCMeta):
                 x1,y1,x2,y2 = box
                 return x1,y1,x2,y2
         return -1,-1,-1,-1
-    
 
 class VideoViewer():
     def __init__(self, video_path,projector,model, width=1200, height=600,pict_width = 800,pict_height =600):
@@ -292,14 +291,25 @@ class VideoViewer():
         self._pict_height = pict_height
         self.default_ball_siz = 50
         
-        self.queue = deque()
-        self.que_sum = 0
-        self.que_limit = 3#移動平均を何回で取るか
+        '''
+        倍率管理だけでいいと思っている
+        # self.queue = deque()
+        # self.que_sum = 0
+        # self.que_limit = 3#移動平均を何回で取るか
+        '''
 
         self.frequentmod = 5 #何回ごとにdetectを行うか
         self.image_queue = deque()
+        self.debugimage_id = deque()
 
+        self.loncnts = deque() #横?に何ブロックずらすかを格納
+        self.latcnts = deque() #縦?に何ブロックずらすかを格納
+        self.mags    = deque() #倍率を格納
+        self.debug_id  = deque()
 
+        '''
+        いらないはず
+        動作確認できたら消す
         self.loncnt = 0 
         self.latcnt = 0 # [-13,13]
 
@@ -307,11 +317,108 @@ class VideoViewer():
         self.d_latcnt = 0
 
         self.lastmag = 1 #拡大倍率
+        '''
+
         self.ball_find = True
+        self.frequent_cnt = -1#数回に1回detectするために使用
 
-    # def detect(self,img):
+    def keep_loncnts_latcnt_mag_siz_under_2(self):
+        if(len(self.loncnts) >= 3):
+            self.loncnts.popleft()
+        if(len(self.latcnts)>= 3):
+            self.latcnts.popleft()
+        if(len(self.mags) >= 3):
+            self.mags.popleft()
+        if(len(self.debug_id)>=3):
+            self.debug_id.popleft()
 
-    
+    def detect(self,img):
+        '''
+        検出する次の画角等の値を決める
+        '''
+        cost = math.inf
+        xmi = ymi = xma = yma = 0#微調整用
+        besti = -1
+        bestj = -1
+        pano = PanoramaViewer(img, self._projector,self._model)
+        for i in range(8):
+            for j in range(5):
+                pano._lon =  6 * i * pano._stride
+                pano._lat = 6 * (j-2) * pano._stride
+                a,b,c,d = pano.ball_place(img,self.ball_find)
+
+                if a == -1 and b ==  -1 and c == -1 and d == -1:
+                    continue
+                #ボールの中心と画像の中心のユークリッド距離
+                nowcost = math.sqrt((self._pict_width/2-(a+c)/2)*(self._pict_width/2-(a+c)/2)+(self._pict_height/2-(b+d)/2)*(self._pict_height/2-(b+d)/2))
+                print(6 * i,6 * (j-2),nowcost)
+                if nowcost < cost:
+                    xmi = a
+                    ymi = b
+                    xma = c
+                    yma = d
+                    besti = i
+                    bestj = j
+                    cost = nowcost
+
+        #もし見つからなかったら前のをコピー、最初のやつだったら...0,0,mag = 1にしておく
+        if(besti == -1):
+            if(len(self.loncnts) >= 1):
+                assert(len(self.loncnts)>= 1 and len(self.latcnts)>= 1 and len(self.mags) >= 1)
+                last_loncnt_copy = self.loncnts[-1] #ちゃんと渡せているか不安
+                self.loncnts.append(last_loncnt_copy)
+                last_latcnt_copy = self.latcnts[-1]
+                self.latcnts.append(last_latcnt_copy)
+                last_mag_copy = self.mags[-1]
+                self.mags.append(last_mag_copy)
+                self.keep_loncnts_latcnt_mag_siz_under_2()
+            else:
+                #キューに何も入ってないとき
+                self.loncnts.append(0)
+                self.latcnts.append(0)
+                self.mags.append(1)
+                self.keep_loncnts_latcnt_mag_siz_under_2()
+            return 
+
+        # #微調整
+        xmid = (xma + xmi)/2
+        ymid = (yma + ymi)/2
+
+        self.loncnts.append(6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width))
+        self.latcnts.append((bestj-2) +((self._pict_height/2-ymid)*6/self._pict_height))
+
+        ball_siz = max(1.0,(abs(xma-xmi) + abs(yma - ymi))/2)
+        self.mags.append(ball_siz/self.default_ball_siz)
+
+        self.keep_loncnts_latcnt_mag_siz_under_2()
+
+        
+        '''
+        描画のときに使うやつ 移動させる!
+        pano._lon = self.loncnt * pano._stride
+        pano._lat = self.latcnt * pano._stride
+        
+        '''
+        # self.queue.append(ball_siz)　<-倍率管理だけでいいはずだからいらない?
+        # self.que_sum += ball_siz     <-同じく
+
+        '''
+        これも描画のときに倍率変更に使う
+        多分 pand._d *= self.mags[0 or1 ?]でいいと思う
+        pano._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
+        '''
+
+    def weighted_loncnt(self):
+        assert(len(self.loncnts) == 2)
+        return self.loncnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.loncnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+
+    def weighted_latcnt(self):
+        assert(len(self.latcnts) == 2)
+        return self.latcnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.latcnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+
+    def weighted_mag(self):
+        assert(len(self.mags) == 2)
+        return self.mags[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.mags[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
 
     def __call__(self):
 
@@ -321,102 +428,34 @@ class VideoViewer():
             ret = False
             img = np.zeros((self._height, self._width, 3), np.uint8)
 
-
-            frequent_cnt = -1#数回に1回detectするために使用
-
             while True:
                 tstart = time.time()
                 ret, img = self._cap.read()
                 self.image_queue.append(img)
-                frequent_cnt+= 1
-                if(frequent_cnt % self.frequentmod != 0):
-                    now_loncnt = self.loncnt + self.d_loncnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
-                    now_latcnt = self.latcnt + self.d_latcnt *  (frequent_cnt % self.frequentmod)  #前2回の結果から線形変換
-                    print(now_loncnt,now_latcnt,self.d_loncnt)
-                    viewer = PanoramaViewer(img, self._projector,self._model,now_loncnt,now_latcnt)
-                    viewer._d *= self.lastmag
-                    viewer()
-                    tend = time.time()
-                    print("time: ",frequent_cnt,": ",tend -tstart)
-                    continue
-                #方針最初だけ全探索して後は差分だけ最初は一番いいのを選ぶ
-                cost = math.inf
+                self.frequent_cnt+= 1
+                self.debugimage_id.append(self.frequent_cnt)
+                if(self.frequent_cnt % self.frequentmod == 0):
+                    #検知する
+                    self.detect(img)#並列化したい
+                    self.debug_id.append(self.frequent_cnt)
 
-                if is_first:
-                    xmi = ymi = xma = yma = 0#微調整用
-                    besti = -1
-                    bestj = -1
-                    pano = PanoramaViewer(img, self._projector,self._model)
-                    for i in range(8):
-                        for j in range(5):
-                            pano._lon =  6 * i * pano._stride
-                            pano._lat = 6 * (j-2) * pano._stride
-                            a,b,c,d = pano.ball_place(img,self.ball_find)
-                            # pano()
-                            # cv2.waitKey(0)
-                            if a == -1 and b ==  -1 and c == -1 and d == -1:
-                                continue
-                            #ボールの中心と画像の中心のユークリッド距離
-                            nowcost = math.sqrt((self._pict_width/2-(a+c)/2)*(self._pict_width/2-(a+c)/2)+(self._pict_height/2-(b+d)/2)*(self._pict_height/2-(b+d)/2))
-                            print(nowcost)
-                            if nowcost < cost:
-                                xmi = a
-                                ymi = b
-                                xma = c
-                                yma = d
-                                besti = i
-                                bestj = j
-                                cost = nowcost
+                #描画
+                if len(self.image_queue) >= 5:
+                    nowimage = self.image_queue[0]
+                    nowiamge_id = self.debugimage_id[0]
+                    self.image_queue.popleft()
+                    self.debugimage_id.popleft()
+                    #今の情報から描画２回以上検知されてたらその結果を使って描画
+                    if(len(self.mags) == 2):
+                        #重み付け変換
+                        nowloncnt = self.weighted_loncnt()
+                        nowlatcnt = self.weighted_latcnt()
+                        nowmag = self.weighted_mag() 
 
-                    # #微調整
-                    xmid = (xma + xmi)/2
-                    ymid = (yma + ymi)/2
-
-                    self.loncnt = 6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width)
-                    self.latcnt = 6 * (bestj-2) +((xmid -self._pict_width/2-ymid)*6/self._pict_width)
-
-                    pano._lon = self.loncnt * pano._stride
-                    pano._lat = self.latcnt * pano._stride
-
-                    ball_siz = max(1.0,(abs(xma-xmi) + abs(yma - ymi))/2)
-                    self.queue.append(ball_siz)
-                    self.que_sum += ball_siz
-
-                    self.lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
-                    pano._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
-
-
-                    pano()
-                    cv2.waitKey(0)
-                    is_first = False
-                else:
-                    viewer = PanoramaViewer(img, self._projector,self._model,self.loncnt,self.latcnt)
-                    a,b,c,d = viewer.ball_place(img,self.ball_find)
-                    if a == -1 and b == -1 and c == -1 and d == -1:
-                        viewer._d *= self.lastmag
-                        self.d_loncnt = 0
-                        self.d_latcnt = 0
-                        self.ball_find = False
-                    else:
-                        xmid = (a + c)/2
-                        ymid = (b + d)/2
-                        self.d_loncnt = (self._pict_width/2-xmid)*6/self._pict_width
-                        self.d_latcnt = (self._pict_height/2-ymid)*6/self._pict_height
-                        self.loncnt += (self._pict_width/2-xmid)*6/self._pict_width
-                        self.latcnt += (self._pict_height/2-ymid)*6/self._pict_height
-                        ball_siz = (abs(a-c) + abs(b-d))/2
-                        self.queue.append(ball_siz)
-                        self.que_sum += ball_siz
-                        while(len(self.queue) > self.que_limit):
-                            self.que_sum -= self.queue[0]
-                            self.queue.popleft()
-                        viewer._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
-                        self.lastmag = (self.que_sum/len(self.queue))/self.default_ball_siz
-                        self.ball_find = True
-
-                    viewer._lon = self.loncnt * viewer._stride
-                    viewer._lat = self.latcnt * viewer._stride
-                    viewer()
+                        #描画する
+                        print(nowiamge_id,self.debug_id[0],self.debug_id[1])
+                        viewer = PanoramaViewer(nowimage, self._projector,self._model,nowloncnt,nowlatcnt,nowmag)
+                        viewer()
 
                 if ret == False:
                     is_continue = False
@@ -428,7 +467,7 @@ class VideoViewer():
                     break
                 
                 tend = time.time()
-                print("time: ",frequent_cnt,": ",tend -tstart)
+                print("time: ",self.frequent_cnt,": ",tend -tstart)
           
             #再生終了
             if is_continue == False:
