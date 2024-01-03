@@ -436,8 +436,8 @@ class VideoViewer():
                 self.debugimage_id.append(self.frequent_cnt)
                 if(self.frequent_cnt % self.frequentmod == 0):
                     #検知する
-                    self.detect(img)#並列化したい
                     self.debug_id.append(self.frequent_cnt)
+                    self.detect(img)#並列化したい
 
                 #描画
                 if len(self.image_queue) >= 5:
