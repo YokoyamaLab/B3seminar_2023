@@ -289,7 +289,7 @@ class VideoViewer():
         self._pict_height = pict_height
         self.default_ball_siz = 50
 
-        self.frequentmod = 5 #何回ごとにdetectを行うか
+        self.frequentmod = 50 #何回ごとにdetectを行うか
         self.image_queue = deque()
         self.debugimage_id = deque()
 
@@ -381,6 +381,8 @@ class VideoViewer():
     def weighted_loncnt(self):
         assert(len(self.loncnts) == 2)
         # return self.loncnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.loncnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        if(abs(self.loncnts[1] - self.loncnts[0]) > 24):
+            return self.loncnts[0] + ((48 if self.loncnts[1] - self.loncnts[0] < 0 else -48)+ self.loncnts[1] - self.loncnts[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
         return self.loncnts[0] + (self.loncnts[1] - self.loncnts[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
 
     def weighted_latcnt(self):
