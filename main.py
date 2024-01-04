@@ -1,12 +1,11 @@
 from abc import ABCMeta, abstractmethod
-import tkinter
-import tkinter.filedialog
+
 from typing import Any
 from ultralytics import YOLO
-import copy
 import math
 from collections import deque
 import time
+import threading
 
 import numpy as np
 import cv2
@@ -289,7 +288,7 @@ class VideoViewer():
         self._pict_height = pict_height
         self.default_ball_siz = 50
 
-        self.frequentmod = 5 #何回ごとにdetectを行うか
+        self.frequentmod = 200 #何回ごとにdetectを行うか
         self.image_queue = deque()
         self.debugimage_id = deque()
 
@@ -300,6 +299,8 @@ class VideoViewer():
 
         self.ball_find = True
         self.frequent_cnt = -1#数回に1回detectするために使用
+
+        self.now_thread = threading.Thread()
 
     def keep_loncnts_latcnt_mag_siz_under_2(self):
         if(len(self.loncnts) >= 3):
@@ -324,13 +325,13 @@ class VideoViewer():
             for j in range(5):
                 pano._lon =  6 * i * pano._stride
                 pano._lat = 6 * (j-2) * pano._stride
-                a,b,c,d = pano.ball_place(img,self.ball_find)
+                a,b,c,d = pano.ball_place(img,False) #self.ball_findで管理してもいいけどFalseにして640固定のほうが安定かも(とくにpict360)
 
                 if a == -1 and b ==  -1 and c == -1 and d == -1:
                     continue
                 #ボールの中心と画像の中心のユークリッド距離
                 nowcost = math.sqrt((self._pict_width/2-(a+c)/2)*(self._pict_width/2-(a+c)/2)+(self._pict_height/2-(b+d)/2)*(self._pict_height/2-(b+d)/2))
-                print(6 * i,6 * (j-2),nowcost)
+                # print(6 * i,6 * (j-2),nowcost)
                 if nowcost < cost:
                     xmi = a
                     ymi = b
@@ -410,7 +411,11 @@ class VideoViewer():
                 if(self.frequent_cnt % self.frequentmod == 0):
                     #検知する
                     self.debug_id.append(self.frequent_cnt)
-                    self.detect(img)#並列化したい
+                    if self.frequent_cnt > 0:
+                        self.now_thread.join()
+                    self.now_thread = threading.Thread(target=self.detect(img))
+                    self.now_thread.start()
+                    # self.detect(img)#並列化したい
                     
 
                 #描画
@@ -427,9 +432,9 @@ class VideoViewer():
                         nowmag = self.weighted_mag() 
 
                         #描画する
-                        print(nowiamge_id,self.debug_id[0],self.debug_id[1])
+                        # print(nowiamge_id,self.debug_id[0],self.debug_id[1])
                         viewer = PanoramaViewer(nowimage, self._projector,self._model,nowloncnt,nowlatcnt)
-                        viewer._d *= nowmag
+                        # viewer._d *= nowmag
                         viewer()
 
                 if ret == False:
@@ -457,7 +462,7 @@ if __name__ == '__main__':
     projector = EquirecProjector()
     # viewer = PanoramaViewer('pingpongball.png', projector,model)
     # viewer()
-    video = VideoViewer('./Videos/soccer_clear.mp4',projector,model)
+    video = VideoViewer('./Videos/soccer_base.mov',projector,model)
     video()
 
     
