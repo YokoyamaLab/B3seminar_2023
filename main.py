@@ -288,13 +288,6 @@ class VideoViewer():
         self._pict_width = pict_width
         self._pict_height = pict_height
         self.default_ball_siz = 50
-        
-        '''
-        倍率管理だけでいいと思っている
-        # self.queue = deque()
-        # self.que_sum = 0
-        # self.que_limit = 3#移動平均を何回で取るか
-        '''
 
         self.frequentmod = 5 #何回ごとにdetectを行うか
         self.image_queue = deque()
@@ -304,18 +297,6 @@ class VideoViewer():
         self.latcnts = deque() #縦?に何ブロックずらすかを格納
         self.mags    = deque() #倍率を格納
         self.debug_id  = deque()
-
-        '''
-        いらないはず
-        動作確認できたら消す
-        self.loncnt = 0 
-        self.latcnt = 0 # [-13,13]
-
-        self.d_loncnt = 0 #変化率
-        self.d_latcnt = 0
-
-        self.lastmag = 1 #拡大倍率
-        '''
 
         self.ball_find = True
         self.frequent_cnt = -1#数回に1回detectするために使用
@@ -396,21 +377,6 @@ class VideoViewer():
         # self._d = ball_siz/self.default_ball_siz
         # pano()
         #デバッグ用出力終わり
-        
-        '''
-        描画のときに使うやつ 移動させる!
-        pano._lon = self.loncnt * pano._stride
-        pano._lat = self.latcnt * pano._stride
-        
-        '''
-        # self.queue.append(ball_siz)　<-倍率管理だけでいいはずだからいらない?
-        # self.que_sum += ball_siz     <-同じく
-
-        '''
-        これも描画のときに倍率変更に使う
-        多分 pand._d *= self.mags[0 or1 ?]でいいと思う
-        pano._d *= (self.que_sum/len(self.queue))/self.default_ball_siz
-        '''
 
     def weighted_loncnt(self):
         assert(len(self.loncnts) == 2)
