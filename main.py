@@ -6,6 +6,7 @@ import math
 from collections import deque
 import time
 import threading
+from multiprocessing import Process
 
 import numpy as np
 import cv2
@@ -300,7 +301,7 @@ class VideoViewer():
         self.ball_find = True
         self.frequent_cnt = -1#数回に1回detectするために使用
 
-        self.now_thread = threading.Thread()
+        self.now_thread = Process()
 
     def keep_loncnts_latcnt_mag_siz_under_2(self):
         if(len(self.loncnts) >= 3):
@@ -413,7 +414,7 @@ class VideoViewer():
                     self.debug_id.append(self.frequent_cnt)
                     if self.frequent_cnt > 0:
                         self.now_thread.join()
-                    self.now_thread = threading.Thread(target=self.detect(img))
+                    self.now_thread = Process(target=self.detect(img))
                     self.now_thread.start()
                     # self.detect(img)#並列化したい
                     
