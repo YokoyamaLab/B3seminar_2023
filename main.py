@@ -414,7 +414,7 @@ class VideoViewer():
                     
 
                 #描画
-                if len(self.image_queue) >= 5:
+                if len(self.image_queue) >= self.frequentmod:
                     nowimage = self.image_queue[0]
                     nowiamge_id = self.debugimage_id[0]
                     self.image_queue.popleft()
