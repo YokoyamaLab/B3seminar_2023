@@ -251,9 +251,7 @@ class PanoramaViewer(metaclass=ABCMeta):
                                 mapping_style=self._mapping_style, fov_mode=False)
         cv2.imshow("image", image)
         # self._model(image,show=True)
-        
-        # self.detect_contour(image)
-        # self.detect_feature_point(image)
+
         return
     
     def ball_place(self,img,flag):
@@ -385,13 +383,19 @@ class VideoViewer():
         ymid = (yma + ymi)/2
 
         self.loncnts.append(6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width))
-        self.latcnts.append((bestj-2) +((self._pict_height/2-ymid)*6/self._pict_height))
+        self.latcnts.append(6 *(bestj-2) +((self._pict_height/2-ymid)*6/self._pict_height))
 
         ball_siz = max(1.0,(abs(xma-xmi) + abs(yma - ymi))/2)
         self.mags.append(ball_siz/self.default_ball_siz)
 
         self.keep_loncnts_latcnt_mag_siz_under_2()
 
+        #デバッグ用出力
+        # pano._lon = (6 *besti +((self._pict_width/2 -xmid)*6/self._pict_width)) * pano._stride
+        # pano._lat = (6 *(bestj-2) +((self._pict_height/2-ymid)*6/self._pict_height)) * pano._stride
+        # self._d = ball_siz/self.default_ball_siz
+        # pano()
+        #デバッグ用出力終わり
         
         '''
         描画のときに使うやつ 移動させる!
@@ -410,15 +414,18 @@ class VideoViewer():
 
     def weighted_loncnt(self):
         assert(len(self.loncnts) == 2)
-        return self.loncnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.loncnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        # return self.loncnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.loncnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        return self.loncnts[0] + (self.loncnts[1] - self.loncnts[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
 
     def weighted_latcnt(self):
         assert(len(self.latcnts) == 2)
-        return self.latcnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.latcnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        # return self.latcnts[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.latcnts[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        return self.latcnts[0] + (self.latcnts[1] - self.latcnts[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
 
     def weighted_mag(self):
         assert(len(self.mags) == 2)
-        return self.mags[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.mags[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        # return self.mags[0]*(self.frequentmod -(self.frequent_cnt % self.frequentmod))/self.frequentmod +  self.mags[1]*(self.frequent_cnt % self.frequentmod)/self.frequentmod
+        return self.mags[0] + (self.mags[1] - self.mags[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
 
     def __call__(self):
 
@@ -438,6 +445,7 @@ class VideoViewer():
                     #検知する
                     self.debug_id.append(self.frequent_cnt)
                     self.detect(img)#並列化したい
+                    
 
                 #描画
                 if len(self.image_queue) >= 5:
@@ -454,7 +462,8 @@ class VideoViewer():
 
                         #描画する
                         print(nowiamge_id,self.debug_id[0],self.debug_id[1])
-                        viewer = PanoramaViewer(nowimage, self._projector,self._model,nowloncnt,nowlatcnt,nowmag)
+                        viewer = PanoramaViewer(nowimage, self._projector,self._model,nowloncnt,nowlatcnt)
+                        viewer._d *= nowmag
                         viewer()
 
                 if ret == False:
@@ -467,7 +476,7 @@ class VideoViewer():
                     break
                 
                 tend = time.time()
-                print("time: ",self.frequent_cnt,": ",tend -tstart)
+                # print("time: ",self.frequent_cnt,": ",tend -tstart)
           
             #再生終了
             if is_continue == False:
