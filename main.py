@@ -398,7 +398,6 @@ class VideoViewer():
         return self.mags[0] + (self.mags[1] - self.mags[0]) * ((self.frequent_cnt % self.frequentmod + 1)/self.frequentmod)
 
     def __call__(self):
-
         while True:
             is_continue = True
             is_first = True
@@ -466,7 +465,9 @@ if __name__ == '__main__':
     # viewer = PanoramaViewer('pingpongball.png', projector,model)
     # viewer()
     video = VideoViewer('./Videos/soccer_base.mov',projector,model)
-    video()
+    pros = Process(target=video())
+    pros.start()
+    # video()
 
     
     
