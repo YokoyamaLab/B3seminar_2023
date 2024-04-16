@@ -11,10 +11,10 @@ Python 3.10.12
 ### git clone から仮想環境の作成
 git clone 
 ``` 
-https://github.com/igeeeeee/B3seminar.git
+https://github.com/YokoyamaLab/B3seminar_2023.git
 ```
 ```
-cd  B3seminer
+cd  B3seminer_2023
 ```
 仮想環境の作成
 
