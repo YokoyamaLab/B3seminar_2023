@@ -1,4 +1,4 @@
-#　エラーと解決法
+# エラーと解決法
 
 ## 1つめ
 Traceback (most recent call last):
@@ -93,6 +93,8 @@ ldd /mnt/c/Users/hirot/programing/B3seminar/.venv/lib/python3.10/site-packages/c
         libmd.so.0 => /lib/x86_64-linux-gnu/libmd.so.0 (0x00007f4b31827000)
 
 sudo apt install libsm6 で動いた！！！！！！！！！！！
+
 やはりここらへんが悪さしてたみたい
+
         libSM.so.6 => not found
         libICE.so.6 => not found
