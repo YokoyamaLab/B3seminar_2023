@@ -1,13 +1,8 @@
 from abc import ABCMeta, abstractmethod
-import tkinter
-import tkinter.filedialog
-from typing import Any
 from ultralytics import YOLO
-import copy
 import math
 from collections import deque
 import os
-from contextlib import redirect_stdout
 
 import numpy as np
 import cv2
@@ -404,7 +399,7 @@ if __name__ == '__main__':
     projector = EquirecProjector()
     # viewer = PanoramaViewer('pingpongball.png', projector,model)
     # viewer()
-    video = VideoViewer('./Videos/soccer_base.mov',projector,model)
+    video = VideoViewer('./Videos/soccer.mov',projector,model)
     video()
 
     
