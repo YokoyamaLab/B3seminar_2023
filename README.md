@@ -14,7 +14,7 @@ git clone
 git clone https://github.com/YokoyamaLab/B3seminar_2023.git
 ```
 ```
-cd  B3seminer_2023
+cd  B3seminar_2023
 ```
 仮想環境の作成
 
