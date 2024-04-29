@@ -50,4 +50,4 @@ python3 main.py
 
 
 ## 実行時のエラーについて
-wsl環境で出たエラーはfixbug_log.mdにまとめた
+wsl環境で出たエラーは[fixbug_log.md](https://github.com/YokoyamaLab/B3seminar_2023/blob/main/fixbug_log.md)にまとめた
