@@ -3,7 +3,6 @@
 
 GPUサーバー上のプログラムは[こちら](https://github.com/igeeeeee/B3project2023_presen)
 
-(TODO: GPUサーバー上のプログラムのリポジトリを横山研のところに移動する)
 
 
 # 使い方
